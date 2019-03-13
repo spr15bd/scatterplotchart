@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+	<style>
+		h1 {
+  			font-size:1.6em;
+  			text-align:center;
+  			font-family:tahoma;
+		}
+		
+		#content {
+  			width:100%;
+  			margin-left:auto;
+  			margin-right:auto;
+		
+		}
+		
+		#tooltip {	
+  			position: absolute;			
+  			text-align: center;			
+  			width: 136px;							
+			padding: 2px;				
+  			font: 12px sans-serif;			
+			background: purple;	
+  			border: 1px solid black;	
+			border-radius: 4px;			
+  			color: white;
+  			opacity: 0;
+		}
+	</style>
+	<head>
+    		<title id="title">Doping in Professional Bicycle Racing</title>
+    		<script defer src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+    		<script src="https://d3js.org/d3.v4.min.js"></script>
+    	</head>
+	<body>
+		<div id="content"><h1>Doping in Professional Bicycle Racing</h1>
+  			<h2>35 Fastest times up Alpe d'Huez</h2>
+		</div>
+		<script>
+			var json;
+			var dataset;
+			var xScale=0;
+			var yScale=0;
+			const svgWidth = 720;
+			const svgHeight = 400;
+			const svg = d3.select("div")
+                  		.append("svg")
+                  		.attr("width",svgWidth)
+                  		.attr("height",svgHeight);
+			const tooltip = d3
+                  		.select("body")
+                  		.append("div")
+                  		.attr("id", "tooltip")
+                  	var padding = 45;
+			document.addEventListener('DOMContentLoaded',function(){
+  				req=new XMLHttpRequest();
+  				req.open("GET",'https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/cyclist-data.json',true);
+  						req.send();
+  				req.onload=function(){
+    					json=JSON.parse(req.responseText);
+					dataset=json;
+    					drawGraph();
+  				}
+			});
+
+			function drawGraph() {
+  				var yDataFormat="%M:%S";
+  				var xDataFormat="%Y";
+  
+				// use the above formats to parse the time data from the string data of the api (Time and Year)
+  
+				var parsedYData=dataset.map((d)=>{
+    					return d3.timeParse(yDataFormat)(d.Time)                      
+  				});
+  
+				// X data is parsed (only min and max values) further down with an extra year added/subtracted to give a space between the x-axis and values
+  				xScale = d3.scaleTime()
+  					.domain([d3.min(dataset, (d)=> {return d3.timeParse(xDataFormat)(d.Year-1)}), d3.max(dataset, (d)=>{return d3.timeParse(xDataFormat)(d.Year+1)})])
+  					.range([padding, svgWidth-padding]);
+  
+				yScale = d3.scaleTime()
+  					.domain(d3.extent(parsedYData))
+  					.range([padding, svgHeight-padding]);
+  
+				var xAxis = d3.axisBottom(xScale)
+                			.tickFormat(function(d){
+                  				return d3.timeFormat(xDataFormat)(d)
+                			});
+  				var yAxis = d3.axisLeft(yScale)
+                			.tickFormat(function(d){
+                  				return d3.timeFormat(yDataFormat)(d)
+                			});
+    
+  				svg.append("g")
+      					.attr("id", "x-axis")
+      					.attr("transform", "translate(0, "+(svgHeight-padding)+")")
+      					.call(xAxis);
+  
+				svg.append("g")
+      					.attr("id", "y-axis")
+      					.attr("transform", "translate("+padding+", "+(0)+")")
+      					.call(yAxis);
+;     
+  				svg.append("text")      
+					// text label for the x axis
+        				.attr("x", svgWidth/2 )
+        				.attr("y",  svgHeight-10 )
+        				.style("text-anchor", "middle")
+        				.text("Year");    
+  
+				svg.append("text")      
+					// text label for the x axis
+        				.attr("x", padding/6 )
+        				.attr("y",  padding/2)
+        				.style("text-anchor", "left")
+        				.text("Time");
+ 
+  				svg.selectAll("circle")
+        				.data(dataset)
+       					.enter()
+        				.append("circle")
+        				.attr("class", "dot")
+        				.attr("data-xvalue", (d)=>{ return parseInt((d.Year))})
+        				.attr("data-yvalue", (d)=>{ return d3.timeParse(yDataFormat)(d.Time) })
+        				.attr("fill", (d)=> {
+          					if (d.Doping=="") {
+            						return "RGB(0,150,255)";
+          					} else {
+            						return "RGB(255,180,0)";
+          					}
+        				})
+        				.style("stroke", "black")
+        				.attr("cx", (d)=>{ return xScale(d3.timeParse(xDataFormat)(d.Year) )})
+        				.attr("cy", (d)=>{ return yScale(d3.timeParse(yDataFormat)(d.Time) )})
+        				.attr("r", (d)=> 6)
+        				.on("mouseover", (d)=>{
+          					tooltip
+          						.html(d.Name+": "+d.Nationality+"<br/>Year: "+d.Year+",  Time: "+d.Time+"<br/>"+d.Doping)
+          						.attr("data-year", d.Year)
+          						.style("left", d3.event.pageX + 30+"px")
+          						.style("top", d3.event.pageY - 60 + "px")
+          						.style("opacity", 0.9)
+          					}
+					)
+        				.on("mouseout", () => {
+          					tooltip
+          						.style("opacity", 0)
+          						// setting pointer-events to none removes tooltip flicker/lack of tooltip responsiveness
+          						.style('pointer-events', 'none')
+        					}
+					);
+  
+				var legend = svg.append("g")
+        				.attr("id", "legend")
+        				.attr("transform", "translate("+(svgWidth-200)+", "+(padding)+")")
+        				.text("No doping allegations");
+        
+   				legend.append('rect')
+        				.attr('width', 10)
+        				.attr('height', 10)
+        				.attr("fill", "RGB(0,150,255)")
+        				.style("stroke", "black");
+
+  				legend.append('rect')
+        				.attr('y', 20)
+        				.attr('width', 10)
+        				.attr('height', 10)
+        				.attr("fill", "RGB(255,180,0)")
+        				.style("stroke", "black");
+  
+				legend.append('text')
+        				.attr('x', 20)
+        				.attr('y', 10)
+        				.attr('width', 10)
+        				.attr('height', 10)
+        				.text("No doping allegations");
+  
+				legend.append('text')
+        				.attr('x', 20)
+        				.attr('y', 30)
+        				.attr('width', 10)
+        				.attr('height', 10)
+        				.text("Doping allegations")
+			}
+		</script>
+	</body>	
+</html>
